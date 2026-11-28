@@ -6,9 +6,12 @@ import Mathlib
 Source: https://oeis.org/A084644
 Credit: @Solfanbtc
 
-Data: `2, 3, 4, 7, 19, 37, 55, 85, 121, 147, 148, 150, 151, 187, 188, 190, 191, 192, 193, 198`.
+Data (all 55 listed terms, through `721`):
+`2, 3, 4, 7, 19, 37, 55, 85, 121, 147, 148, 150, 151, 187, 188, 190, 191, 192, 193, 198, 199,
+  235, 241, 264, 267, 269, 270, 291, 292, 293, 294, 295, 343, 346, 347, 348, 349, 408, 409, 412,
+  414, 415, 417, 418, 419, 420, 421, 481, 499, 564, 565, 649, 689, 690, 721`.
 The entry says the terms for `n > 5` are only conjectures (those for `n ≤ 5` are proved). The
-conjecture is that these are the first 20 terms; `main` states it as: for `2 ≤ m ≤ 198`, `m`
+conjecture is that these are the first 55 terms; `main` states it as: for `2 ≤ m ≤ 721`, `m`
 sets a new density record if and only if `m` is one of the listed values.
 
 Conventions.
@@ -43,10 +46,12 @@ def IsRecord (m : ℕ) : Prop := 2 ≤ m ∧ ∀ j, 2 ≤ j → j < m → densit
 
 /-- The listed terms of A084644. -/
 def terms : List ℕ :=
-  [2, 3, 4, 7, 19, 37, 55, 85, 121, 147, 148, 150, 151, 187, 188, 190, 191, 192, 193, 198]
+  [2, 3, 4, 7, 19, 37, 55, 85, 121, 147, 148, 150, 151, 187, 188, 190, 191, 192, 193, 198, 199,
+  235, 241, 264, 267, 269, 270, 291, 292, 293, 294, 295, 343, 346, 347, 348, 349, 408, 409, 412,
+  414, 415, 417, 418, 419, 420, 421, 481, 499, 564, 565, 649, 689, 690, 721]
 
-/-- The conjectured first 20 terms: up to 198 the records are exactly the listed values. -/
-theorem main : ∀ m : ℕ, 2 ≤ m → m ≤ 198 → (IsRecord m ↔ m ∈ terms) := by
+/-- The conjectured first 55 terms: up to 721 the records are exactly the listed values. -/
+theorem main : ∀ m : ℕ, 2 ≤ m → m ≤ 721 → (IsRecord m ↔ m ∈ terms) := by
   sorry
 
 end OMA.S_oeis_a084644
