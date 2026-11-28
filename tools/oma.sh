@@ -189,7 +189,20 @@ submit)
 Uses: $USES   (teammates' lemmas from the task board that this proof uses: credits their authors)"
   git add -- "$FILE"
   git commit -q -m "proof: $ID" -- "$FILE"
-  git push -q -u origin "$BR" --force-with-lease
+  # A push that fails (network) must not leave the checkout on $BR: the next commands would run main's copy of
+  # tools/, and the file would exist only in that local commit. Three tries, then back where submit started,
+  # with the file restored, so that submit can simply be run again.
+  PUSHED=0
+  for TRY in 1 2 3; do
+    if git push -q -u origin "$BR" --force-with-lease; then PUSHED=1; break; fi
+    sleep $((TRY * ${OMA_PUSH_WAIT:-10}))
+  done
+  if [ "$PUSHED" != 1 ]; then
+    cp -- "$FILE" "$STATE/unpushed.lean"
+    git checkout -q -
+    mkdir -p "$(dirname "$FILE")"; cp -- "$STATE/unpushed.lean" "$FILE"
+    die "could not push $BR to origin (network?); nothing was sent, $FILE is kept: run tools/oma.sh submit $ID again"
+  fi
   BODY="Lease: $L
 Agent: ${OMA_AGENT:-unknown}
 Model: ${OMA_MODEL:-unknown}$USELINE

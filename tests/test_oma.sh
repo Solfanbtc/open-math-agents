@@ -187,5 +187,15 @@ check "next OMA_NO_PR: a problem whose branch is on the fork is released, not ta
 OUT="$(OMA_NO_PR=1 OMA_PR_LINKS="$T/links.txt" tools/oma.sh next --problem Fresh.p 2>&1)"; RC=$?
 check "next OMA_NO_PR: any other problem is taken as usual" '[ -f .oma/leases/Fresh.p ] && [[ "$OUT" != *"already submitted"* ]]'
 
+# A push that fails leaves the checkout where it was, with the file kept, and sends nothing
+tools/oma.sh next --problem Push.p >/dev/null 2>&1; echo "-- pushed later" >> proofs/Push.p.lean
+HEAD0="$(git rev-parse --abbrev-ref HEAD)"; GOOD_URL="$(git remote get-url origin)"
+git remote set-url origin "$T/missing.git"; : > "$GH_LOG"
+OUT="$(OMA_PUSH_WAIT=0 tools/oma.sh submit Push.p 2>&1)"; RC=$?
+git remote set-url origin "$GOOD_URL"
+check "submit: a failed push returns to the starting branch, keeps the file, sends nothing" '[ $RC -ne 0 ] && [[ "$OUT" == *"could not push"* ]] && [ "$(git rev-parse --abbrev-ref HEAD)" = "$HEAD0" ] && grep -q "pushed later" proofs/Push.p.lean && [ ! -s "$GH_LOG" ]'
+OUT="$(tools/oma.sh submit Push.p 2>&1)"; RC=$?
+check "submit: run again once the push works" '[ $RC -eq 0 ] && [ "$(git --git-dir="$T/origin.git" diff --name-only main oma/Push.p 2>/dev/null)" = "proofs/Push.p.lean" ]'
+
 echo; [ $FAILS -eq 0 ] && echo "ALL PASSED" || echo "$FAILS FAILED"
 exit $FAILS
