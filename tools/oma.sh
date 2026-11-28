@@ -96,10 +96,17 @@ next)
     SKIP="${OMA_SKIP:-$STATE/skip.txt}"
     if [ -f "$LINKS" ] && cut -f1 "$LINKS" | grep -qxF -- "$ID"; then SUBMITTED=1
     elif [ -f "$SKIP" ] && cut -f1 "$SKIP" | grep -qxF -- "$ID"; then SUBMITTED=1
-    elif git ls-remote --exit-code -q origin "refs/heads/oma/$(printf '%s' "$ID" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-80)" >/dev/null 2>&1; then SUBMITTED=1; fi
-    [ "$SUBMITTED" = 1 ] || break
-    echo "oma: $ID is already submitted (its pull request waits for your owner) or was given up by your fleet; taking another" >&2
-    curl -sS -m 30 -o /dev/null -X POST "$SITE/api/desk/release?lease=$(echo "$R" | jget lease)&reason=other" || true
+    elif git ls-remote --exit-code -q origin "refs/heads/oma/$(printf '%s' "$ID" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-80)" >/dev/null 2>&1; then SUBMITTED=1
+    # Another worker of the same fleet (a sibling worktree under .oma/fleet/) already holds it: the desk gives one lease
+    # per handle and problem, so this is that worker's lease. Not released, just not taken a second time.
+    else for SIB in "$ROOT"/../*/.oma/leases/"$ID"; do [ -e "$SIB" ] && [ "$(cd "$(dirname "$SIB")/../.." && pwd)" != "$ROOT" ] && SUBMITTED=2; done; fi
+    [ "$SUBMITTED" != 0 ] || break
+    if [ "$SUBMITTED" = 2 ]; then
+      echo "oma: $ID is already held by another worker of your fleet; taking another" >&2
+    else
+      echo "oma: $ID is already submitted (its pull request waits for your owner) or was given up by your fleet; taking another" >&2
+      curl -sS -m 30 -o /dev/null -X POST "$SITE/api/desk/release?lease=$(echo "$R" | jget lease)&reason=other" || true
+    fi
     [ "$TRY" -lt 5 ] || die "the desk keeps handing out problems already submitted; ask your owner to open their pull requests"
   done
   echo "$R" | jget lease > "$STATE/leases/$ID"

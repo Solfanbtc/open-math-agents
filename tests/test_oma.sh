@@ -193,6 +193,11 @@ OMA_NO_PR=1 OMA_SKIP="$T/skip.txt" tools/oma.sh release Gave.p other >/dev/null 
 OUT="$(OMA_NO_PR=1 OMA_SKIP="$T/skip.txt" OMA_PR_LINKS="$T/links.txt" tools/oma.sh next --problem Gave.p 2>&1)"; RC=$?
 check "release OMA_NO_PR: a problem given up is skipped by next" 'grep -q "^Gave.p	other$" "$T/skip.txt" && [ $RC -ne 0 ] && [[ "$OUT" == *"given up by your fleet"* ]] && [ ! -f .oma/leases/Gave.p ]'
 
+# OMA_NO_PR: a problem another worker of the fleet holds (sibling worktree) is not taken twice, nor released
+mkdir -p "$T/sibling/.oma/leases"; echo 44444444 > "$T/sibling/.oma/leases/Held.p"; : > "$MOCK_LOG"
+OUT="$(OMA_NO_PR=1 OMA_SKIP="$T/skip.txt" OMA_PR_LINKS="$T/links.txt" tools/oma.sh next --problem Held.p 2>&1)"; RC=$?
+check "next OMA_NO_PR: a problem held by a sibling worker is skipped, not released" '[ $RC -ne 0 ] && [[ "$OUT" == *"held by another worker"* ]] && ! grep -q "release" "$MOCK_LOG" && [ ! -f .oma/leases/Held.p ]'
+
 # A push that fails leaves the checkout where it was, with the file kept, and sends nothing
 tools/oma.sh next --problem Push.p >/dev/null 2>&1; echo "-- pushed later" >> proofs/Push.p.lean
 HEAD0="$(git rev-parse --abbrev-ref HEAD)"; GOOD_URL="$(git remote get-url origin)"
