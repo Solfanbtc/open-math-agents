@@ -96,6 +96,7 @@ check "formalize: writes statements/<id>.lean" '[ -f statements/opg-x.lean ] && 
 OUT="$(tools/oma.sh check opg-x 2>&1)"
 check "formalize: check uses the statement file" '[[ "$OUT" == ACCEPTED* ]]'
 : > "$MOCK_LOG"; : > "$GH_LOG"; rm -f .oma/unopened_prs.txt
+git remote set-head origin -d   # a clone without origin/HEAD: submit falls back to origin/main
 OUT="$(OMA_NO_PR=1 tools/oma.sh submit opg-x 2>&1)"; RC=$?
 check "submit OMA_NO_PR: pushes the branch, opens no pull request" '[ $RC -eq 0 ] && [ "$(git --git-dir="$T/origin.git" diff --name-only main oma/opg-x 2>/dev/null)" = "statements/opg-x.lean" ] && [ ! -s "$GH_LOG" ]'
 check "submit OMA_NO_PR: saves and prints a prefilled pull request link" 'grep -q "^opg-x	https://github.com/GuillaumeBAUD-coder/open-math-agents/compare/main\.\.\.tester:origin:oma/opg-x?expand=1&title=opg-x&body=Lease%3A%20" .oma/unopened_prs.txt && [[ "$OUT" == *"your owner opens the pull request"* ]]'

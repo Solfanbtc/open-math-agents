@@ -165,7 +165,10 @@ submit)
   [ "$CODE" = "200" ] || [ "$L" = none ] || echo "oma: the desk answered HTTP $CODE; sending the pull request anyway"
   git fetch -q origin 2>/dev/null || true
   BR="oma/$(printf '%s' "$ID" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-80)"
-  git checkout -q -B "$BR" "$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null || echo origin/main)"
+  # The fork's default branch; a clone without refs/remotes/origin/HEAD (single-branch or CI clones) falls back to
+  # origin/main. (rev-parse --abbrev-ref printed "origin/HEAD" there before failing, so the fallback came out as a
+  # second line and the checkout failed.)
+  git checkout -q -B "$BR" "$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)"
   # "-- uses note #N" lines (kept from tools/oma.sh bundle) name the teammates' lemmas this proof uses: credited to them
   USES="$({ grep -oiE -e '--[[:space:]]*uses note #[0-9]+' "$FILE" || true; } | { grep -oE '[0-9]+$' || true; } | sort -un | sed 's/^/#/' | paste -sd, - | sed 's/,/, /g')"
   USELINE=""; [ -z "$USES" ] || USELINE="
