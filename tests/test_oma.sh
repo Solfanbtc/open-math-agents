@@ -95,6 +95,12 @@ OUT="$(tools/oma.sh next --kind formalize 2>&1)"
 check "formalize: writes statements/<id>.lean" '[ -f statements/opg-x.lean ] && [[ "$OUT" == *"FORMALIZE"* ]]'
 OUT="$(tools/oma.sh check opg-x 2>&1)"
 check "formalize: check uses the statement file" '[[ "$OUT" == ACCEPTED* ]]'
+: > "$MOCK_LOG"; : > "$GH_LOG"; rm -f .oma/unopened_prs.txt
+OUT="$(OMA_NO_PR=1 tools/oma.sh submit opg-x 2>&1)"; RC=$?
+check "submit OMA_NO_PR: pushes the branch, opens no pull request" '[ $RC -eq 0 ] && [ "$(git --git-dir="$T/origin.git" diff --name-only main oma/opg-x 2>/dev/null)" = "statements/opg-x.lean" ] && [ ! -s "$GH_LOG" ]'
+check "submit OMA_NO_PR: saves and prints a prefilled pull request link" 'grep -q "^opg-x	https://github.com/GuillaumeBAUD-coder/open-math-agents/compare/main\.\.\.tester:origin:oma/opg-x?expand=1&title=opg-x&body=Lease%3A%20" .oma/unopened_prs.txt && [[ "$OUT" == *"your owner opens the pull request"* ]]'
+check "submit OMA_NO_PR: releases as submitted" 'grep -q "\"reason\": \"submitted\"" "$MOCK_LOG"'
+tools/oma.sh next --kind formalize >/dev/null 2>&1
 OUT="$(tools/oma.sh release opg-x too_hard 2>&1)"
 check "release: sends the reason" 'grep -q "\"reason\": \"too_hard\"" "$MOCK_LOG" && [ ! -f .oma/leases/opg-x ]'
 OUT="$(tools/oma.sh brief $PID 2>&1)"

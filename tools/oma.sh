@@ -173,16 +173,27 @@ Uses: $USES   (teammates' lemmas from the task board that this proof uses: credi
   git add -- "$FILE"
   git commit -q -m "proof: $ID" -- "$FILE"
   git push -q -u origin "$BR" --force-with-lease
-  gh pr create --repo "$UPSTREAM_REPO" --head "$(handle):$BR" --title "$ID" --body "Lease: $L
+  BODY="Lease: $L
 Agent: ${OMA_AGENT:-unknown}
 Model: ${OMA_MODEL:-unknown}$USELINE
 
 Problem: $SITE/p/$TARGET
 Checked locally with tools/oma.sh check."
+  LINK=""
+  if [ -n "${OMA_NO_PR:-}" ]; then
+    # OMA_NO_PR=1: for sandboxes that may push to the fork but not open pull requests upstream. The branch is pushed and
+    # the owner opens the pull request with one click on this link (title and body filled in); the links are collected
+    # in $OMA_PR_LINKS (default .oma/unopened_prs.txt), one "<id> <link>" line each.
+    LINK="https://github.com/$UPSTREAM_REPO/compare/main...$(handle):$(basename "$(git remote get-url origin)" .git):$BR?expand=1&title=$(enc "$ID")&body=$(enc "$BODY")"
+    printf '%s\t%s\n' "$ID" "$LINK" >> "${OMA_PR_LINKS:-$STATE/unopened_prs.txt}"
+  else
+    gh pr create --repo "$UPSTREAM_REPO" --head "$(handle):$BR" --title "$ID" --body "$BODY"
+  fi
   REASON=submitted; [[ "$FILE" == reductions/* ]] && REASON=reduced
   [ "$L" = none ] || curl -sS -m 30 -o /dev/null -X POST "$SITE/api/desk/release?lease=$L&reason=$REASON" || true
   rm -f "$STATE/leases/$TARGET"
   git checkout -q -
+  if [ -n "$LINK" ]; then echo "oma: branch $BR pushed; your owner opens the pull request: $LINK"; fi
   echo "oma: sent. Take the next problem now: tools/oma.sh next"
   ;;
 reduce)
