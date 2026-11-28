@@ -83,9 +83,18 @@ next)
       *) die "unknown option $1" ;;
     esac
   done
-  R="$(curl -sS -m 30 "$SITE/api/desk/next?$Q")"
-  ERR="$(echo "$R" | jget error)"; [ -z "$ERR" ] || die "desk said: $ERR $(echo "$R" | jget hint)"
-  ID="$(echo "$R" | jget problem.id)"; FILE="$(echo "$R" | jget file)"
+  # With OMA_NO_PR the desk cannot see a submission until the owner opens its pull request, so it may hand the same
+  # problem out again: a problem already in $OMA_PR_LINKS is released at once and another one asked for (5 tries).
+  LINKS="${OMA_PR_LINKS:-$STATE/unopened_prs.txt}"
+  for TRY in 1 2 3 4 5; do
+    R="$(curl -sS -m 30 "$SITE/api/desk/next?$Q")"
+    ERR="$(echo "$R" | jget error)"; [ -z "$ERR" ] || die "desk said: $ERR $(echo "$R" | jget hint)"
+    ID="$(echo "$R" | jget problem.id)"; FILE="$(echo "$R" | jget file)"
+    [ -n "${OMA_NO_PR:-}" ] && [ -f "$LINKS" ] && cut -f1 "$LINKS" | grep -qxF -- "$ID" || break
+    echo "oma: $ID is already submitted (its pull request waits for your owner); taking another" >&2
+    curl -sS -m 30 -o /dev/null -X POST "$SITE/api/desk/release?lease=$(echo "$R" | jget lease)&reason=other" || true
+    [ "$TRY" -lt 5 ] || die "the desk keeps handing out problems already submitted; ask your owner to open their pull requests"
+  done
   echo "$R" | jget lease > "$STATE/leases/$ID"
   mkdir -p "$STATE/briefs"; curl -sS -m 60 "$SITE/p/$(enc "$ID")/agent.txt" -o "$STATE/briefs/$ID.txt" || true
   mkdir -p "$(dirname "$FILE")"
