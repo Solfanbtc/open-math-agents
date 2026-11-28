@@ -93,10 +93,12 @@ next)
     ID="$(echo "$R" | jget problem.id)"; FILE="$(echo "$R" | jget file)"
     [ -n "${OMA_NO_PR:-}" ] || break
     SUBMITTED=0
+    SKIP="${OMA_SKIP:-$STATE/skip.txt}"
     if [ -f "$LINKS" ] && cut -f1 "$LINKS" | grep -qxF -- "$ID"; then SUBMITTED=1
+    elif [ -f "$SKIP" ] && cut -f1 "$SKIP" | grep -qxF -- "$ID"; then SUBMITTED=1
     elif git ls-remote --exit-code -q origin "refs/heads/oma/$(printf '%s' "$ID" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-80)" >/dev/null 2>&1; then SUBMITTED=1; fi
     [ "$SUBMITTED" = 1 ] || break
-    echo "oma: $ID is already submitted (its pull request waits for your owner); taking another" >&2
+    echo "oma: $ID is already submitted (its pull request waits for your owner) or was given up by your fleet; taking another" >&2
     curl -sS -m 30 -o /dev/null -X POST "$SITE/api/desk/release?lease=$(echo "$R" | jget lease)&reason=other" || true
     [ "$TRY" -lt 5 ] || die "the desk keeps handing out problems already submitted; ask your owner to open their pull requests"
   done
@@ -270,6 +272,9 @@ release)
   L="$(lease_of "$1")"
   curl -sS -m 30 -X POST "$SITE/api/desk/release?lease=$L&reason=$(enc "$2")"; echo
   rm -f "$STATE/leases/$1"
+  # In a fleet (OMA_NO_PR), a problem given up is not taken again by the fleet's next: the desk would hand it out
+  # again (it stays among the least crowded). Shared through $OMA_SKIP (default .oma/skip.txt).
+  [ -z "${OMA_NO_PR:-}" ] || printf '%s\t%s\n' "$1" "$2" >> "${OMA_SKIP:-$STATE/skip.txt}"
   ;;
 board)
   [ $# -ge 1 ] || die "usage: board <id>"

@@ -187,6 +187,12 @@ check "next OMA_NO_PR: a problem whose branch is on the fork is released, not ta
 OUT="$(OMA_NO_PR=1 OMA_PR_LINKS="$T/links.txt" tools/oma.sh next --problem Fresh.p 2>&1)"; RC=$?
 check "next OMA_NO_PR: any other problem is taken as usual" '[ -f .oma/leases/Fresh.p ] && [[ "$OUT" != *"already submitted"* ]]'
 
+# OMA_NO_PR: a problem the fleet gave up (released) is skipped by next afterwards
+rm -f .oma/leases/Fresh.p; tools/oma.sh next --problem Gave.p >/dev/null 2>&1
+OMA_NO_PR=1 OMA_SKIP="$T/skip.txt" tools/oma.sh release Gave.p other >/dev/null 2>&1
+OUT="$(OMA_NO_PR=1 OMA_SKIP="$T/skip.txt" OMA_PR_LINKS="$T/links.txt" tools/oma.sh next --problem Gave.p 2>&1)"; RC=$?
+check "release OMA_NO_PR: a problem given up is skipped by next" 'grep -q "^Gave.p	other$" "$T/skip.txt" && [ $RC -ne 0 ] && [[ "$OUT" == *"given up by your fleet"* ]] && [ ! -f .oma/leases/Gave.p ]'
+
 # A push that fails leaves the checkout where it was, with the file kept, and sends nothing
 tools/oma.sh next --problem Push.p >/dev/null 2>&1; echo "-- pushed later" >> proofs/Push.p.lean
 HEAD0="$(git rev-parse --abbrev-ref HEAD)"; GOOD_URL="$(git remote get-url origin)"
