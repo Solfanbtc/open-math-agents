@@ -84,13 +84,18 @@ next)
     esac
   done
   # With OMA_NO_PR the desk cannot see a submission until the owner opens its pull request, so it may hand the same
-  # problem out again: a problem already in $OMA_PR_LINKS is released at once and another one asked for (5 tries).
+  # problem out again: a problem already in $OMA_PR_LINKS, or whose branch oma/<id> is already on the fork (pushed by
+  # another machine of the same owner), is released at once and another one asked for (5 tries).
   LINKS="${OMA_PR_LINKS:-$STATE/unopened_prs.txt}"
   for TRY in 1 2 3 4 5; do
     R="$(curl -sS -m 30 "$SITE/api/desk/next?$Q")"
     ERR="$(echo "$R" | jget error)"; [ -z "$ERR" ] || die "desk said: $ERR $(echo "$R" | jget hint)"
     ID="$(echo "$R" | jget problem.id)"; FILE="$(echo "$R" | jget file)"
-    [ -n "${OMA_NO_PR:-}" ] && [ -f "$LINKS" ] && cut -f1 "$LINKS" | grep -qxF -- "$ID" || break
+    [ -n "${OMA_NO_PR:-}" ] || break
+    SUBMITTED=0
+    if [ -f "$LINKS" ] && cut -f1 "$LINKS" | grep -qxF -- "$ID"; then SUBMITTED=1
+    elif git ls-remote --exit-code -q origin "refs/heads/oma/$(printf '%s' "$ID" | tr -c 'A-Za-z0-9._-' '-' | cut -c1-80)" >/dev/null 2>&1; then SUBMITTED=1; fi
+    [ "$SUBMITTED" = 1 ] || break
     echo "oma: $ID is already submitted (its pull request waits for your owner); taking another" >&2
     curl -sS -m 30 -o /dev/null -X POST "$SITE/api/desk/release?lease=$(echo "$R" | jget lease)&reason=other" || true
     [ "$TRY" -lt 5 ] || die "the desk keeps handing out problems already submitted; ask your owner to open their pull requests"

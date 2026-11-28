@@ -176,12 +176,16 @@ check "bundle --check: reports to the board" 'grep -q "\"op\": \"verify\", \"ite
 OUT="$(tools/oma.sh submit $TP 2>&1)"; RC=$?
 check "submit: the Uses line names the teammates' notes" '[ $RC -eq 0 ] && grep -q "^Uses: #77, #78 " "$GH_LOG" && grep -q "^Model: test-model$" "$GH_LOG"'
 
-# OMA_NO_PR: a problem already submitted (its link is in OMA_PR_LINKS) is released at once, not worked on again
-printf '%s\thttps://example.invalid/pr\n' "$PID" > "$T/links.txt"; : > "$MOCK_LOG"; rm -f ".oma/leases/$PID"
-OUT="$(OMA_NO_PR=1 OMA_PR_LINKS="$T/links.txt" tools/oma.sh next --problem $PID 2>&1)"; RC=$?
-check "next OMA_NO_PR: a problem already submitted is released, not taken" '[ $RC -ne 0 ] && [[ "$OUT" == *"already submitted"* ]] && grep -q "\"reason\": \"other\"" "$MOCK_LOG" && [ ! -f ".oma/leases/$PID" ]'
+# OMA_NO_PR: a problem already submitted (its link is in OMA_PR_LINKS, or its branch is on the fork) is released at
+# once, not worked on again
+printf '%s\thttps://example.invalid/pr\n' "Linked.p" > "$T/links.txt"; : > "$MOCK_LOG"
+OUT="$(OMA_NO_PR=1 OMA_PR_LINKS="$T/links.txt" tools/oma.sh next --problem Linked.p 2>&1)"; RC=$?
+check "next OMA_NO_PR: a problem whose link is saved is released, not taken" '[ $RC -ne 0 ] && [[ "$OUT" == *"already submitted"* ]] && grep -q "\"reason\": \"other\"" "$MOCK_LOG" && [ ! -f .oma/leases/Linked.p ]'
+rm -f .oma/leases/opg-x; : > "$MOCK_LOG"
 OUT="$(OMA_NO_PR=1 OMA_PR_LINKS="$T/links.txt" tools/oma.sh next --kind formalize 2>&1)"; RC=$?
-check "next OMA_NO_PR: another problem is taken as usual" '[ -f .oma/leases/opg-x ] && [[ "$OUT" == *"FORMALIZE"* ]] && [[ "$OUT" != *"already submitted"* ]]'
+check "next OMA_NO_PR: a problem whose branch is on the fork is released, not taken" '[ $RC -ne 0 ] && [[ "$OUT" == *"already submitted"* ]] && [ ! -f .oma/leases/opg-x ]'
+OUT="$(OMA_NO_PR=1 OMA_PR_LINKS="$T/links.txt" tools/oma.sh next --problem Fresh.p 2>&1)"; RC=$?
+check "next OMA_NO_PR: any other problem is taken as usual" '[ -f .oma/leases/Fresh.p ] && [[ "$OUT" != *"already submitted"* ]]'
 
 echo; [ $FAILS -eq 0 ] && echo "ALL PASSED" || echo "$FAILS FAILED"
 exit $FAILS
