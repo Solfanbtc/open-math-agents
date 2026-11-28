@@ -1,52 +1,41 @@
 import OMAReductions.R_LittlewoodConjecture_littlewood_conjecture_R1
-import Mathlib
 
 -- Step LittlewoodConjecture.littlewood_conjecture.R1.H1: hypothesis H1 of reduction LittlewoodConjecture.littlewood_conjecture.R1
--- Credit: @ivillar
+-- Credit: @Solfanbtc
 
-/-!
-The rational case of the Littlewood conjecture: along the multiples of the denominator of `α`
-the factor `‖n α‖` vanishes, and all terms are nonnegative, so the liminf is zero.
--/
-namespace F2LW
+/-! For a rational `α = q`, the term vanishes at every multiple `n` of the denominator of `q`
+(`n α` is then an integer), and all terms are nonnegative: so the sequence is bounded below by
+`0` and frequently equal to `0`, and its `liminf` is `0`. -/
+
 open Filter
 
-theorem liminf_zero (u : ℕ → ℝ) (h0 : ∀ n, 0 ≤ u n)
-    (hf : ∀ ε : ℝ, 0 < ε → ∃ᶠ n in atTop, u n < ε) : liminf u atTop = 0 := by
-  have hb : IsBoundedUnder (· ≥ ·) atTop u := isBoundedUnder_of ⟨0, fun n => h0 n⟩
-  have hc : IsCoboundedUnder (· ≥ ·) atTop u :=
-    IsCoboundedUnder.of_frequently_le (a := 1) ((hf 1 one_pos).mono fun n h => h.le)
-  apply le_antisymm
-  · apply le_of_forall_pos_le_add
-    intro ε hε
-    rw [zero_add]
-    exact liminf_le_of_frequently_le ((hf ε hε).mono fun n h => h.le) hb
-  · exact le_liminf_of_le hc (Eventually.of_forall h0)
-
-theorem rational : ∀ α β : ℝ, (∃ q : ℚ, α = q) →
-    atTop.liminf (fun (n : ℕ) ↦ n * distToNearestInt (n * α) * distToNearestInt (n * β)) = 0 := by
-  rintro α β ⟨q, rfl⟩
-  apply liminf_zero
-  · intro n
-    exact mul_nonneg (mul_nonneg (Nat.cast_nonneg n) (distToNearestInt_nonneg _))
+theorem OMA.solution : OMA.R_LittlewoodConjecture_littlewood_conjecture_R1.H1 := by
+  intro α β ⟨q, hq⟩
+  have hd0 : ∀ m : ℤ, distToNearestInt (m : ℝ) = 0 := fun m => by simp [distToNearestInt]
+  have hnonneg : ∀ n : ℕ,
+      0 ≤ (n : ℝ) * distToNearestInt (n * α) * distToNearestInt (n * β) := fun n =>
+    mul_nonneg (mul_nonneg (Nat.cast_nonneg n) (distToNearestInt_nonneg _))
       (distToNearestInt_nonneg _)
-  · intro ε hε
+  have hzero : ∀ k : ℕ, ((k * q.den : ℕ) : ℝ) * distToNearestInt ((k * q.den : ℕ) * α) *
+      distToNearestInt ((k * q.den : ℕ) * β) = 0 := by
+    intro k
+    have hint : ((k * q.den : ℕ) : ℝ) * α = ((k * q.num : ℤ) : ℝ) := by
+      have hden : (q.den : ℝ) ≠ 0 := by exact_mod_cast q.den_ne_zero
+      rw [hq, Rat.cast_def]
+      push_cast
+      field_simp
+    rw [hint, hd0, mul_zero, zero_mul]
+  have hfreq : ∃ᶠ n : ℕ in atTop,
+      (n : ℝ) * distToNearestInt (n * α) * distToNearestInt (n * β) = 0 := by
     rw [frequently_atTop]
-    intro N
-    refine ⟨(N + 1) * q.den, ?_, ?_⟩
-    · have := q.den_pos
-      nlinarith
-    · have hden : (q.den : ℝ) ≠ 0 := by exact_mod_cast q.den_pos.ne'
-      have hint : (((N + 1) * q.den : ℕ) : ℝ) * (q : ℝ) = (((N + 1 : ℕ) * q.num : ℤ) : ℝ) := by
-        rw [Rat.cast_def]
-        push_cast
-        field_simp
-      have hz : distToNearestInt ((((N + 1) * q.den : ℕ) : ℝ) * (q : ℝ)) = 0 := by
-        rw [hint, distToNearestInt, round_intCast, sub_self, abs_zero]
-      rw [hz, mul_zero, zero_mul]
-      exact hε
-
-end F2LW
-
-theorem OMA.solution : OMA.R_LittlewoodConjecture_littlewood_conjecture_R1.H1 :=
-  F2LW.rational
+    intro a
+    refine ⟨a * q.den, ?_, hzero a⟩
+    have := q.den_pos
+    nlinarith
+  apply le_antisymm
+  · exact liminf_le_of_frequently_le (hfreq.mono fun n h => h.le)
+      (isBoundedUnder_of ⟨0, hnonneg⟩)
+  · refine le_liminf_of_le ⟨0, fun a ha => ?_⟩ (Eventually.of_forall hnonneg)
+    rw [eventually_map] at ha
+    obtain ⟨n, h1, h2⟩ := (ha.and_frequently hfreq).exists
+    linarith
