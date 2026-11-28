@@ -25,9 +25,10 @@ data of A023193) for n ≤ 25, and the largest prime count in windows {x, ..., x
 
 namespace OMA.S_oeis_a023193
 
-/-- `S` misses some residue class modulo every prime. -/
+/-- `S` misses some residue class modulo every prime: some `r < p` is not the residue of any
+member of `S` modulo `p`. -/
 def Admissible (S : Finset ℕ) : Prop :=
-  ∀ p : ℕ, p.Prime → ∃ r : ℕ, ∀ s ∈ S, s % p ≠ r
+  ∀ p : ℕ, p.Prime → ∃ r : ℕ, r < p ∧ ∀ s ∈ S, s % p ≠ r
 
 /-- A023193(n): the largest size of an admissible set `S ⊆ {0, ..., n-1}` with `0 ∈ S`. -/
 noncomputable def a (n : ℕ) : ℕ :=
