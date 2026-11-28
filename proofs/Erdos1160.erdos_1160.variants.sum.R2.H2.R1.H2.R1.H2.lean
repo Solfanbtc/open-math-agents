@@ -80,27 +80,6 @@ theorem iso_of_mul_equiv {G H : FiniteGrp} (e : G ≃ H)
   let f : G ≃* H := { e with map_mul' := h }
   exact ⟨InducedCategory.isoMk (F := FiniteGrp.toGrp) f.toGrpIso⟩
 
-/-- Equality of the isomorphism classes is exactly simultaneous relabeling
-of the two input positions and the output by one permutation. -/
-theorem groupClass_eq_iff {n : ℕ} (s t : GroupTable n) :
-    groupClass s = groupClass t ↔
-      ∃ e : Equiv.Perm (Fin n), ∀ a b, e (s.val a b) = t.val (e a) (e b) := by
-  constructor
-  · intro h
-    obtain ⟨i⟩ := Quotient.exact h
-    let e := ((inducedFunctor FiniteGrp.toGrp).mapIso i).groupIsoToMulEquiv
-    refine ⟨e.toEquiv, fun a b => ?_⟩
-    have hmul (a b : model s) :
-        e (product (model s) a b) = product (model t) (e a) (e b) := e.map_mul a b
-    exact (congrArg (fun z => e z) (model_mul s a b)).symm.trans
-      ((hmul a b).trans (model_mul t (e a) (e b)))
-  · rintro ⟨e,h⟩
-    apply Quotient.sound
-    apply iso_of_mul_equiv e
-    intro a b
-    exact (congrArg (fun z => e z) (model_mul s a b)).trans
-      ((h a b).trans (model_mul t (e a) (e b)).symm)
-
 /-- Every group of order n can be labeled with the elements of Fin n. -/
 theorem range_groupClass (n : ℕ) : Set.range (@groupClass n) = orderClasses n := by
   ext c
@@ -116,31 +95,6 @@ theorem range_groupClass (n : ℕ) : Set.range (@groupClass n) = orderClasses n 
     apply iso_of_mul_equiv e
     intro a b
     exact (congrArg (fun z => e z) (model_mul t a b)).trans (e.apply_symm_apply (e a * e b))
-
-/-- The kernel relation has the explicit relabeling description in
-`groupClass_eq_iff`. -/
-noncomputable def relabelSetoid (n : ℕ) : Setoid (GroupTable n) :=
-  Setoid.ker (@groupClass n)
-
-/-- Group isomorphism classes of order n are in bijection with group
-multiplication tables on n labels up to relabeling. -/
-noncomputable def tablesEquivClasses (n : ℕ) :
-    Quotient (relabelSetoid n) ≃ orderClasses n :=
-  (Setoid.quotientKerEquivRange (@groupClass n)).trans (Equiv.setCongr (range_groupClass n))
-
-theorem g_eq_card_tables (n : ℕ) : Erdos1160.g n = Nat.card (Quotient (relabelSetoid n)) :=
-  (Nat.card_congr (tablesEquivClasses n)).symm
-
-/-- A coarse upper bound obtained by ignoring the group axioms and counting all
-binary operations on the labeled carrier. -/
-theorem g_le_table_count (n : ℕ) : Erdos1160.g n ≤ n ^ (n * n) := by
-  rw [g_eq_card_tables]
-  calc
-    Nat.card (Quotient (relabelSetoid n)) ≤ Nat.card (GroupTable n) :=
-      Nat.card_le_card_of_surjective _ Quotient.mk_surjective
-    _ ≤ Nat.card (Fin n → Fin n → Fin n) :=
-      Nat.card_le_card_of_injective Subtype.val Subtype.val_injective
-    _ = n ^ (n * n) := by rw [Nat.card_fun, Nat.card_fun, Nat.card_fin, pow_mul]
 
 theorem orderClasses_finite (n : ℕ) : (orderClasses n).Finite := by
   rw [← range_groupClass]
@@ -552,9 +506,6 @@ noncomputable def rep {k : ℕ} (c : orderClasses k) : FiniteGrp.{0} :=
 theorem rep_class {k : ℕ} (c : orderClasses k) :
     Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) (rep c) = c.val :=
   (Classical.choose_spec c.property).2
-
-theorem rep_card {k : ℕ} (c : orderClasses k) : Nat.card (rep c) = k :=
-  (Classical.choose_spec c.property).1
 
 noncomputable def realize {n : ℕ} (x : Profile n) : FiniteGrp.{0} :=
   FiniteGrp.of (∀ p, rep (x p))
@@ -987,86 +938,6 @@ theorem odd_power_exponent {p k m : ℕ} (hp : 3 ≤ p) (hn : p^k ≤ 2^m) :
     _ ≤ (2^m)^7 := Nat.pow_le_pow_left ((Nat.pow_le_pow_left hp k).trans hn) 7
     _ = 2^(7*m) := by rw [← Nat.pow_mul, Nat.mul_comm]
 
-private theorem slope_margin (r k : ℕ) (hr : 400 ≤ r) (hk : 11*k ≤ 7*(r+1)) :
-    162*(r+3) + 27*((r+1)*k^2) + 72*r^2 ≤ 12*r^3 := by
-  have hs := Nat.mul_le_mul hk hk
-  have hcube := Nat.mul_le_mul_left (r+1) hs
-  have h3 : 400*r^2 ≤ r^3 := by
-    simpa only [pow_succ, pow_zero, Nat.one_mul, Nat.mul_assoc] using Nat.mul_le_mul_right (r*r) hr
-  have h2 : 400*r ≤ r^2 := by
-    simpa only [pow_two] using Nat.mul_le_mul_right r hr
-  nlinarith only [hcube,h3,h2,hr]
-
-/-- Compare a sixth-power count with the cubic lower bound for the previous dyadic order. -/
-theorem count_compare_of_slope_fourfold {k r x y : ℕ} (hr : 400 ≤ r)
-    (hk : 11*k ≤ 7*(r+1)) (hxh : x^6 ≤ 2^((r+1)*k^2))
-    (hy : 2^(2*r^3) ≤ y^27 * 2^(12*r^2)) :
-    2^(r+3) * x ≤ y := by
-  have hyleft : (2 : ℕ)^(12*r^3) ≤ y^162 * 2^(72*r^2) := calc
-    _ = (2^(2*r^3))^6 := by rw [← Nat.pow_mul]; congr 1; ring
-    _ ≤ (y^27 * 2^(12*r^2))^6 := Nat.pow_le_pow_left hy _
-    _ = _ := by rw [Nat.mul_pow, ← Nat.pow_mul, ← Nat.pow_mul]; congr 2 <;> ring
-  have hxl : x^162 ≤ 2^(27*((r+1)*k^2)) := calc
-    _ = (x^6)^27 := Nat.pow_mul _ _ _
-    _ ≤ (2^((r+1)*k^2))^27 := Nat.pow_le_pow_left hxh _
-    _ = _ := by rw [← Nat.pow_mul, Nat.mul_comm 27]
-  have lhs : (2^(r+3) * x)^162 * 2^(72*r^2) ≤ 2^(12*r^3) := calc
-    _ = ((2^(r+3))^162 * x^162) * 2^(72*r^2) := by rw [Nat.mul_pow]
-    _ ≤ ((2^(r+3))^162 * 2^(27*((r+1)*k^2))) * 2^(72*r^2) :=
-      Nat.mul_le_mul_right _ (Nat.mul_le_mul_left _ hxl)
-    _ = 2^(162*(r+3) + 27*((r+1)*k^2) + 72*r^2) := by
-      rw [← Nat.pow_mul, ← Nat.pow_add, ← Nat.pow_add, Nat.mul_comm (r+3) 162]
-    _ ≤ _ := Nat.pow_le_pow_right (by decide) (slope_margin r k hr hk)
-  have small : (2^(r+3) * x)^162 ≤ y^162 :=
-    Nat.le_of_mul_le_mul_right (lhs.trans hyleft) (by positivity)
-  exact (Nat.pow_le_pow_iff_left (by decide : 162 ≠ 0)).mp small
-
-theorem count_compare_of_slope {k r x y : ℕ} (hr : 400 ≤ r)
-    (hk : 11*k ≤ 7*(r+1)) (hxh : x^6 ≤ 2^((r+1)*k^2))
-    (hy : 2^(2*r^3) ≤ y^27 * 2^(12*r^2)) :
-    2^(r+2) * x ≤ y :=
-  (Nat.mul_le_mul_right x (Nat.pow_le_pow_right (by decide) (by omega : r+2 ≤ r+3))).trans
-    (count_compare_of_slope_fourfold hr hk hxh hy)
-
-/-- A coarse prime-power presentation count is enough for the total contribution
-of odd prime powers when compared with the sharp lower bound for 2-groups. -/
-theorem odd_count_compare {p k r x y : ℕ} (hp : 3 ≤ p) (hr : 400 ≤ r)
-    (hn : p^k ≤ 2^(r+1)) (hx : x^6 ≤ p^(k^3))
-    (hy : 2^(2*r^3) ≤ y^27 * 2^(12*r^2)) :
-    2^(r+2) * x ≤ y := by
-  have hxh : x^6 ≤ 2^((r+1)*k^2) := calc
-    x^6 ≤ p^(k^3) := hx
-    _ = (p^k)^(k^2) := by rw [← Nat.pow_mul]; congr 1; ring
-    _ ≤ (2^(r+1))^(k^2) := Nat.pow_le_pow_left hn _
-    _ = _ := (Nat.pow_mul _ _ _).symm
-  exact count_compare_of_slope hr (odd_power_exponent hp hn) hxh hy
-
-/-- Sum a common pointwise budget over a finite set of at most N orders. -/
-theorem sum_le_of_budget {A : Type*} (s : Finset A) (a : A → ℕ) {N b c : ℕ}
-    (hN : 0 < N) (hs : s.card ≤ N) (ha : ∀ i ∈ s, (c*N)*a i ≤ b) :
-    c*(∑ i ∈ s, a i) ≤ b := by
-  apply Nat.le_of_mul_le_mul_left (c := N)
-  · calc
-      N*(c*∑ i ∈ s, a i) = ∑ i ∈ s, (c*N)*a i := by
-        rw [← Finset.mul_sum, ← Nat.mul_assoc, Nat.mul_comm N c]
-      _ ≤ ∑ _i ∈ s, b := Finset.sum_le_sum ha
-      _ = s.card * b := by simp
-      _ ≤ N*b := Nat.mul_le_mul_right _ hs
-  · exact hN
-
-/-- Sum a common pointwise budget over a finite set of at most N orders. -/
-theorem twice_sum_le_of_budget {A : Type*} (s : Finset A) (a : A → ℕ) {N b : ℕ}
-    (hN : 0 < N) (hs : s.card ≤ N) (ha : ∀ i ∈ s, (2*N)*a i ≤ b) :
-    2*(∑ i ∈ s, a i) ≤ b := by
-  apply Nat.le_of_mul_le_mul_left (c := N)
-  · calc
-      N*(2*∑ i ∈ s, a i) = ∑ i ∈ s, (2*N)*a i := by
-        rw [← Finset.mul_sum, ← Nat.mul_assoc, Nat.mul_comm N 2]
-      _ ≤ ∑ _i ∈ s, b := Finset.sum_le_sum ha
-      _ = s.card * b := by simp
-      _ ≤ N*b := Nat.mul_le_mul_right _ hs
-  · exact hN
-
 end Erdos1160Enumeration
 
 end
@@ -1166,47 +1037,6 @@ theorem card_le_of_fiber_bound {A B : Type*} [Finite A] [Finite B] (f : A → B)
     _ ≤ ∑ _b : B, M := Finset.sum_le_sum (fun b _ => h b)
     _ = Nat.card B * M := by simp [Nat.card_eq_fintype_card]
 
-/-- An isomorphism preserving all the marked elements distinguishes parameter
-values. Forgetting the k marks can identify at most n^k parameters per class. -/
-theorem card_le_of_marked_family {A : Type*} [Finite A] {n k : ℕ}
-    (X : A → FiniteGrp.{0}) (hN : ∀ a, Nat.card (X a) = n)
-    (mark : (a : A) → Fin k → X a)
-    (sep : ∀ (a b : A) (e : X a ≃* X b),
-      (∀ i, e (mark a i) = mark b i) → a = b) :
-    Nat.card A ≤ Erdos1160.g n * n ^ k := by
-  classical
-  let f (a : A) : Tables.orderClasses n := ⟨Quotient.mk _ (X a), X a, hN a, rfl⟩
-  let : Finite (Tables.orderClasses n) := (Tables.orderClasses_finite n).to_subtype
-  apply card_le_of_fiber_bound f (n ^ k)
-  intro c
-  let F := {a : A // f a = c}
-  by_cases hn : Nonempty F
-  · let r := Classical.choice hn
-    have sameClass (a : F) : Quotient.mk (isIsomorphicSetoid FiniteGrp.{0}) (X a.val)
-        = Quotient.mk _ (X r.val) :=
-      congrArg Subtype.val (a.property.trans r.property.symm)
-    let transport (a : F) : X a.val ≃* X r.val :=
-      ((inducedFunctor FiniteGrp.toGrp).mapIso
-        (Classical.choice (Quotient.exact (sameClass a)))).groupIsoToMulEquiv
-    let encode (a : F) (i : Fin k) : X r.val := transport a (mark a.val i)
-    have uniqueCode : Function.Injective encode := by
-      intro a b he
-      apply Subtype.ext
-      apply sep a.val b.val ((transport a).trans (transport b).symm)
-      intro i
-      apply (transport b).injective
-      change transport b ((transport b).symm (transport a (mark a.val i))) =
-        transport b (mark b.val i)
-      rw [MulEquiv.apply_symm_apply]
-      exact congrFun he i
-    calc
-      Nat.card F ≤ Nat.card (Fin k → X r.val) :=
-        Nat.card_le_card_of_injective encode uniqueCode
-      _ = n ^ k := by rw [Nat.card_fun, hN, Nat.card_fin]
-  · have empty : IsEmpty F := not_nonempty_iff.mp hn
-    change Nat.card F ≤ n ^ k
-    simp
-
 end Erdos1160.PresentationCount
 
 end
@@ -1302,11 +1132,6 @@ instance : Group (BilinearExtension B) where
   inv_mul_cancel x := by
     apply BilinearExtension.ext <;> simp
 
-def projection (B : V →+ V →+ W) : BilinearExtension B →* Multiplicative V where
-  toFun x := Multiplicative.ofAdd x.base
-  map_mul' _ _ := rfl
-  map_one' := rfl
-
 def coordinateEquiv (B : V →+ V →+ W) : BilinearExtension B ≃ V × W where
   toFun x := (x.base, x.fiber)
   invFun x := ⟨x.1, x.2⟩
@@ -1325,133 +1150,7 @@ theorem commutator_formula (x y : BilinearExtension B) :
   apply BilinearExtension.ext <;> simp [map_add, map_neg]
   abel
 
-theorem commutator_le_kernel (B : V →+ V →+ W) :
-    commutator (BilinearExtension B) ≤ (projection B).ker := by
-  apply Subgroup.commutator_le.mpr
-  intro x _ y _
-  rw [commutator_formula]
-  rfl
-
-theorem central_fiber (w : W) :
-    (⟨0,w⟩ : BilinearExtension B) ∈ Subgroup.center (BilinearExtension B) := by
-  rw [Subgroup.mem_center_iff]
-  intro y
-  apply BilinearExtension.ext <;> simp
-  abel
-
-/-- Surjectivity of the alternating commutator on pairs ensures that the fiber is characteristic. -/
-def AllFiberCommutators (B : V →+ V →+ W) : Prop :=
-  ∀ w : W, ∃ u v : V, B u v - B v u = w
-
-theorem commutator_eq_kernel (h : AllFiberCommutators B) :
-    commutator (BilinearExtension B) = (projection B).ker := by
-  apply le_antisymm (commutator_le_kernel B)
-  intro x hx
-  have hx0 : x.base = 0 := hx
-  obtain ⟨u, v, huv⟩ := h x.fiber
-  let a : BilinearExtension B := ⟨u, 0⟩
-  let b : BilinearExtension B := ⟨v, 0⟩
-  have heq : ⁅a, b⁆ = x := by
-    rw [commutator_formula]
-    exact BilinearExtension.ext hx0.symm huv
-  rw [← heq]
-  exact Subgroup.commutator_mem_commutator (Subgroup.mem_top a) (Subgroup.mem_top b)
-
 variable {V' W' : Type*} [AddCommGroup V'] [AddCommGroup W'] {C : V' →+ V' →+ W'}
-
-theorem map_fiber_base (h : AllFiberCommutators B)
-    (f : BilinearExtension B →* BilinearExtension C) (w : W) :
-    (f ⟨0, w⟩).base = 0 := by
-  obtain ⟨u, v, huv⟩ := h w
-  let a : BilinearExtension B := ⟨u, 0⟩
-  let b : BilinearExtension B := ⟨v, 0⟩
-  have heq : ⁅a, b⁆ = ⟨0, w⟩ := by
-    rw [commutator_formula]
-    exact BilinearExtension.ext rfl huv
-  rw [← heq, map_commutatorElement, commutator_formula]
-
-theorem map_base_lift (h : AllFiberCommutators B)
-    (f : BilinearExtension B →* BilinearExtension C) (x : BilinearExtension B) :
-    (f x).base = (f ⟨x.base, 0⟩).base := by
-  have decomp : x = (⟨x.base, 0⟩ : BilinearExtension B) * ⟨0, x.fiber⟩ := by
-    apply BilinearExtension.ext <;> simp
-  conv => lhs; rw [decomp, map_mul, mul_base, map_fiber_base h, add_zero]
-
-def inducedBase (h : AllFiberCommutators B) (f : BilinearExtension B →* BilinearExtension C) :
-    V →+ V' where
-  toFun u := (f ⟨u, 0⟩).base
-  map_zero' := by change (f 1).base = 0; rw [map_one, one_base]
-  map_add' u v := by
-    let x : BilinearExtension B := ⟨u, 0⟩
-    let y : BilinearExtension B := ⟨v, 0⟩
-    exact (map_base_lift h f (x*y)).symm.trans (by rw [map_mul, mul_base])
-
-def inducedFiber (h : AllFiberCommutators B) (f : BilinearExtension B →* BilinearExtension C) :
-    W →+ W' where
-  toFun w := (f ⟨0, w⟩).fiber
-  map_zero' := by change (f 1).fiber = 0; rw [map_one, one_fiber]
-  map_add' w z := by
-    let x : BilinearExtension B := ⟨0, w⟩
-    let y : BilinearExtension B := ⟨0, z⟩
-    have eqn : (⟨0, w+z⟩ : BilinearExtension B) = x*y := by apply BilinearExtension.ext <;> simp [x,y]
-    rw [eqn, map_mul, mul_fiber]
-    simp [x, y, map_fiber_base h]
-
-theorem inducedBase_apply (h : AllFiberCommutators B)
-    (f : BilinearExtension B →* BilinearExtension C) (x : BilinearExtension B) :
-    inducedBase h f x.base = (f x).base := (map_base_lift h f x).symm
-
-theorem map_lift_fiber (h : AllFiberCommutators B)
-    (f : BilinearExtension B →* BilinearExtension C) (w : W) :
-    f ⟨0, w⟩ = ⟨0, inducedFiber h f w⟩ :=
-  BilinearExtension.ext (map_fiber_base h f w) rfl
-
-theorem intertwinement (h : AllFiberCommutators B)
-    (f : BilinearExtension B →* BilinearExtension C) (u v : V) :
-    inducedFiber h f (B u v - B v u) =
-    C (inducedBase h f u) (inducedBase h f v) - C (inducedBase h f v) (inducedBase h f u) := by
-  let x : BilinearExtension B := ⟨u, 0⟩
-  let y : BilinearExtension B := ⟨v, 0⟩
-  have hm := map_commutatorElement f x y
-  rw [commutator_formula, commutator_formula] at hm
-  exact congrArg BilinearExtension.fiber hm
-
-theorem inducedBase_leftInv (hB : AllFiberCommutators B) (hC : AllFiberCommutators C)
-    (e : BilinearExtension B ≃* BilinearExtension C) :
-    Function.LeftInverse (inducedBase hC e.symm.toMonoidHom) (inducedBase hB e.toMonoidHom) := by
-  intro u
-  let x : BilinearExtension B := ⟨u, 0⟩
-  change inducedBase hC e.symm.toMonoidHom (e x).base = u
-  rw [inducedBase_apply]
-  change (e.symm (e x)).base = u
-  rw [e.symm_apply_apply]
-
-theorem inducedFiber_leftInv (hB : AllFiberCommutators B) (hC : AllFiberCommutators C)
-    (e : BilinearExtension B ≃* BilinearExtension C) :
-    Function.LeftInverse (inducedFiber hC e.symm.toMonoidHom) (inducedFiber hB e.toMonoidHom) := by
-  intro w
-  change (e.symm ⟨0, inducedFiber hB e.toMonoidHom w⟩).fiber = w
-  rw [← map_lift_fiber hB e.toMonoidHom w]
-  change (e.symm (e ⟨0,w⟩)).fiber = w
-  rw [e.symm_apply_apply]
-
-/-- Any isomorphism of the constructed groups gives a change of coordinates on the
-abelian quotient and the commutator subgroup that preserves the alternating map. -/
-theorem isomorphism_preserves_alternating (hB : AllFiberCommutators B) (hC : AllFiberCommutators C)
-    (e : BilinearExtension B ≃* BilinearExtension C) :
-    ∃ (s : V ≃+ V') (t : W ≃+ W'), ∀ u v,
-      t (B u v - B v u) = C (s u) (s v) - C (s v) (s u) := by
-  let s : V ≃+ V' :=
-    { inducedBase hB e.toMonoidHom with
-      invFun := inducedBase hC e.symm.toMonoidHom
-      left_inv := inducedBase_leftInv hB hC e
-      right_inv := inducedBase_leftInv hC hB e.symm }
-  let t : W ≃+ W' :=
-    { inducedFiber hB e.toMonoidHom with
-      invFun := inducedFiber hC e.symm.toMonoidHom
-      left_inv := inducedFiber_leftInv hB hC e
-      right_inv := inducedFiber_leftInv hC hB e.symm }
-  exact ⟨s, t, intertwinement hB e.toMonoidHom⟩
 
 end BilinearExtension
 
@@ -1901,9 +1600,6 @@ def doubleClass : GroupClass → GroupClass :=
     let f : withC2 G ≃* withC2 H := e.prodCongr (MulEquiv.refl C₂)
     exact ⟨InducedCategory.isoMk (F := FiniteGrp.toGrp) f.toGrpIso⟩)
 
-lemma doubleClass_mk (G : FiniteGrp.{0}) :
-    doubleClass (Quotient.mk _ G) = Quotient.mk _ (withC2 G) := rfl
-
 lemma doubleClass_injective : Function.Injective doubleClass := by
   intro x y
   induction x, y using Quotient.inductionOn₂ with
@@ -1920,18 +1616,6 @@ lemma doubleClass_maps (n : ℕ) : Set.MapsTo doubleClass (orderClasses n) (orde
   change Nat.card (G × C₂) = n * 2
   rw [Nat.card_prod, show Nat.card G = n from hG]
   exact congrArg (n * ·) (Nat.card_fin 2)
-
-lemma mem_doubleClass_image_iff (n : ℕ) (y : GroupClass) :
-    y ∈ doubleClass '' orderClasses n ↔ ∃ G : FiniteGrp.{0}, Nat.card G = n ∧
-      Quotient.mk _ (withC2 G) = y := by
-  constructor
-  · rintro ⟨_, ⟨G,hG,rfl⟩, h⟩
-    exact ⟨G,hG,h⟩
-  · rintro ⟨G,hG,rfl⟩
-    exact ⟨Quotient.mk _ G, ⟨G,hG,rfl⟩, rfl⟩
-
-lemma ncard_doubleClass_image (n : ℕ) : (doubleClass '' orderClasses n).ncard = g n :=
-  (Set.injOn_of_injective doubleClass_injective).ncard_image
 
 theorem g_le_g_double (n : ℕ) : g n ≤ g (n * 2) :=
   Set.ncard_le_ncard_of_injOn doubleClass (doubleClass_maps n)
