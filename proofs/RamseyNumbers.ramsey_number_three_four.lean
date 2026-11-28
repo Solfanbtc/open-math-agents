@@ -19,10 +19,7 @@ lemma eight_fails : ¬ IsGraphRamsey 8 3 4 := by
   let : DecidableRel G.Adj := fun u v => by
     dsimp [G]
     infer_instance
-  intro h
-  apply h G
-  unfold CliqueFree
-  decide
+  exact fun h => h G (by unfold CliqueFree; decide)
 
 lemma six_works : IsGraphRamsey 6 3 3 := by
   classical
@@ -31,8 +28,7 @@ lemma six_works : IsGraphRamsey 6 3 3 := by
   have low_degree (H : SimpleGraph (Fin 6)) (h : H.CliqueFree 3) (hc : Hᶜ.CliqueFree 3) :
       H.degree 0 < 3 := by
     by_contra! hdeg
-    apply hc.mono hdeg (H.neighborFinset 0)
-    refine ⟨?_, rfl⟩
+    refine hc.mono hdeg _ ⟨?_, rfl⟩
     rw [H.coe_neighborFinset, H.isClique_compl]
     exact H.isIndepSet_neighborSet_of_triangleFree h 0
   have hd := low_degree G hG hGc
@@ -46,8 +42,7 @@ lemma nine_works : IsGraphRamsey 9 3 4 := by
   have hdegree (v : Fin 9) : G.degree v = 3 := by
     have upper : G.degree v < 4 := by
       by_contra! h
-      apply hGc.mono h (G.neighborFinset v)
-      refine ⟨?_, rfl⟩
+      refine hGc.mono h _ ⟨?_, rfl⟩
       rw [G.coe_neighborFinset, G.isClique_compl]
       exact G.isIndepSet_neighborSet_of_triangleFree hG v
     have comp_upper : Gᶜ.degree v < 6 := by
@@ -58,8 +53,8 @@ lemma nine_works : IsGraphRamsey 9 3 4 := by
         (Gᶜ.mem_neighborFinset v (f i)).mp (hf ⟨i, rfl⟩)
       -- Apply R(3,3) to these six non-neighbours. An independent triple extends by v.
       let H := G.comap f
-      let e : H ↪g G := SimpleGraph.Embedding.comap f G
-      let ec : Hᶜ ↪g Gᶜ := SimpleGraph.Embedding.complEquiv e
+      let e : H ↪g G := Embedding.comap f G
+      let ec : Hᶜ ↪g Gᶜ := Embedding.complEquiv e
       apply six_works H
       refine ⟨CliqueFree.comap e.isContained hG, ?_⟩
       intro t ht
@@ -69,10 +64,7 @@ lemma nine_works : IsGraphRamsey 9 3 4 := by
       apply hGc _ (htri.insert (a := v) ?_)
       intro w hw
       simp only [Finset.mem_insert, Finset.mem_singleton] at hw
-      rcases hw with rfl | rfl | rfl
-      · exact hv a
-      · exact hv b
-      · exact hv c
+      rcases hw with rfl | rfl | rfl <;> apply hv
     rw [G.degree_compl, Fintype.card_fin] at comp_upper
     omega
   -- Nine vertices of degree three would give an odd degree sum.
@@ -84,10 +76,6 @@ end RamseyThreeFour
 
 theorem OMA.solution : type_of% @RamseyNumbers.ramsey_number_three_four := by
   rw [classicalRamsey_eq_sInf]
-  apply IsLeast.csInf_eq
-  refine ⟨RamseyThreeFour.nine_works, ?_⟩
-  intro n hn
-  by_contra! hlt
-  have hmono : Monotone (fun m => IsGraphRamsey m 3 4) :=
-    monotone_nat_of_le_succ fun m => IsGraphRamsey.succ m 3 4
-  exact RamseyThreeFour.eight_fails (hmono (show n ≤ 8 by omega) hn)
+  exact (Nat.sInf_upward_closed_eq_succ_iff (fun _ _ h => monotone_nat_of_le_succ
+    (f := (IsGraphRamsey · 3 4)) (IsGraphRamsey.succ · 3 4) h) 8).2
+    ⟨RamseyThreeFour.nine_works, RamseyThreeFour.eight_fails⟩
