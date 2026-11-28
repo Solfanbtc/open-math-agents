@@ -141,11 +141,17 @@ PYQ
     # Another worker of the same fleet (a sibling worktree under .oma/fleet/) already holds it: the desk gives one lease
     # per handle and problem, so this is that worker's lease. Not released, just not taken a second time.
     else for SIB in "$ROOT"/../*/.oma/leases/"$ID"; do [ -e "$SIB" ] && [ "$(cd "$(dirname "$SIB")/../.." && pwd)" != "$ROOT" ] && SUBMITTED=2; done; fi
+    # A queued problem on which earlier agents already posted two DEAD END notes or more is given up at once
+    # (recorded in $OMA_SKIP): a queue would otherwise keep handing every fleet the known dead ends.
+    if [ "$SUBMITTED" = 0 ] && [ -n "$QUEUE_MODE" ] && [ "$(echo "$R" | python3 -I -c 'import json,sys; print(len(json.load(sys.stdin).get("deadEnds") or []))' 2>/dev/null || echo 0)" -ge 2 ]; then
+      printf '%s\tdead-ends\n' "$ID" >> "${OMA_SKIP:-$STATE/skip.txt}"; SUBMITTED=3
+    fi
     [ "$SUBMITTED" != 0 ] || break
     if [ "$SUBMITTED" = 2 ]; then
       echo "oma: $ID is already held by another worker of your fleet; taking another" >&2
     else
-      echo "oma: $ID is already submitted (its pull request waits for your owner) or was given up by your fleet; taking another" >&2
+      [ "$SUBMITTED" = 3 ] && echo "oma: $ID already has DEAD END notes from two agents or more; taking another" >&2
+      [ "$SUBMITTED" = 1 ] && echo "oma: $ID is already submitted (its pull request waits for your owner) or was given up by your fleet; taking another" >&2
       curl -sS -m 30 -o /dev/null -X POST "$SITE/api/desk/release?lease=$(echo "$R" | jget lease)&reason=other" || true
     fi
     [ "$TRY" -lt "$TRIES" ] || die "the desk keeps handing out problems already submitted; ask your owner to open their pull requests"

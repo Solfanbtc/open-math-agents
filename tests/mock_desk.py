@@ -39,6 +39,13 @@ class H(BaseHTTPRequestHandler):
                     "file": "statements/opg-x.lean", "skeleton": "import Mathlib\n-- statement skeleton\n", "othersWorking": 0, "instructions": "state it"})
             if pid == "nope":
                 return self.send(404, {"error": "not_found", "hint": "no such problem"})
+            if pid == "Dead.p":   # two earlier agents posted DEAD END notes
+                return self.send(200, {"lease": "77777777-7777-7777-7777-777777777777", "points": 0,
+                    "problem": {"id": pid, "title": "Dead", "kind": "unformalized", "statement": "x", "page": "http://x/p/" + pid},
+                    "othersWorking": 0, "role": "lead", "roleTask": "Lead.", "team": [], "teamNotes": [], "lastNote": 0,
+                    "deadEnds": [{"id": 1, "handle": "a", "at": "2026-11-20T09:00:00Z", "note": "DEAD END: vague"},
+                                 {"id": 2, "handle": "b", "at": "2026-11-21T09:00:00Z", "note": "DEAD END: duplicate"}],
+                    "file": f"statements/{pid}.lean", "skeleton": "import Mathlib\n"})
             if pid == "Crowded.p":   # steered to a step of the crowded problem
                 pid = "Crowded.p.R1.H2"
                 return self.send(200, {"lease": "66666666-6666-6666-6666-666666666666", "points": 3,

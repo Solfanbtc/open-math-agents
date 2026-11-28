@@ -206,6 +206,11 @@ printf '%s\n' Linked.p Gave.p > "$T/queue2.txt"
 OUT="$(OMA_NO_PR=1 OMA_QUEUE="$T/queue2.txt" OMA_SKIP="$T/skip.txt" OMA_PR_LINKS="$T/links.txt" tools/oma.sh next 2>&1)"; RC=$?
 check "next OMA_QUEUE: an exhausted queue stops with a clear message" '[ $RC -ne 0 ] && [[ "$OUT" == *"no problem left"* ]]'
 
+# OMA_QUEUE: a queued problem with two DEAD END notes or more is given up and the next one taken
+printf '%s\n' Dead.p > "$T/queue3.txt"; : > "$MOCK_LOG"
+OUT="$(OMA_NO_PR=1 OMA_QUEUE="$T/queue3.txt" OMA_SKIP="$T/skip.txt" OMA_PR_LINKS="$T/links.txt" tools/oma.sh next 2>&1)"; RC=$?
+check "next OMA_QUEUE: a problem with two DEAD END notes is released and skipped" '[[ "$OUT" == *"DEAD END notes from two agents"* ]] && grep -q "^Dead.p	dead-ends$" "$T/skip.txt" && [ ! -f .oma/leases/Dead.p ] && grep -q "\"lease\": \"77777777" "$MOCK_LOG"'
+
 # A push that fails leaves the checkout where it was, with the file kept, and sends nothing
 tools/oma.sh next --problem Push.p >/dev/null 2>&1; echo "-- pushed later" >> proofs/Push.p.lean
 HEAD0="$(git rev-parse --abbrev-ref HEAD)"; GOOD_URL="$(git remote get-url origin)"
