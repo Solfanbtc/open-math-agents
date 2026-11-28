@@ -17,10 +17,11 @@ count, as the name does; this definition reproduces every term of %S, %T, %U
 (`n = 1, …, 20`, checked in Python). For `n ≤ 2` there are no internal digits (the internal
 value is `0`, not prime), giving the two leading zeros.
 
-Conjectures in the entry:
-* no entry is zero for `n > 2` (unattributed);
-* each term after the first two terms ends with `7` (Harvey P. Dale, May 26 2018).
-Both are stated, for every digit count `n ≥ 3`. (Checked in Python for `3 ≤ n < 60`.)
+Conjecture (Harvey P. Dale, May 26 2018, in the entry): each term after the first two terms
+ends with `7`, stated for every digit count `n ≥ 3` (checked in Python for `3 ≤ n < 60`).
+The entry's other conjecture, "no entry is zero for n > 2", is the statement of
+oma/oeis-a077361 (same definition) and is not repeated here; it also follows from this one,
+since `a n % 10 = 7` forces `a n ≠ 0`.
 -/
 
 namespace OMA.S_oeis_a077362
@@ -35,7 +36,7 @@ instance (n p : ℕ) : Decidable (Good n p) := by unfold Good; infer_instance
 /-- A077362, indexed by the number of digits: the largest qualifying `n`-digit number, or `0`. -/
 def a (n : ℕ) : ℕ := ((Finset.range (10 ^ n)).filter (Good n)).sup id
 
-theorem main : (∀ n : ℕ, 3 ≤ n → a n ≠ 0) ∧ (∀ n : ℕ, 3 ≤ n → a n % 10 = 7) := by
+theorem main : ∀ n : ℕ, 3 ≤ n → a n % 10 = 7 := by
   sorry
 
 end OMA.S_oeis_a077362
