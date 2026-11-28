@@ -87,9 +87,50 @@ next)
   # problem out again: a problem already in $OMA_PR_LINKS, or whose branch oma/<id> is already on the fork (pushed by
   # another machine of the same owner), is released at once and another one asked for (5 tries).
   LINKS="${OMA_PR_LINKS:-$STATE/unopened_prs.txt}"
-  for TRY in 1 2 3 4 5; do
-    R="$(curl -sS -m 30 "$SITE/api/desk/next?$Q")"
-    ERR="$(echo "$R" | jget error)"; [ -z "$ERR" ] || die "desk said: $ERR $(echo "$R" | jget hint)"
+  # OMA_QUEUE (with OMA_NO_PR): a file of problem ids, best first. Instead of letting the desk pick among the 25 best
+  # known problems of the filter (a pool a fleet exhausts within the hour while its pull requests wait for the owner),
+  # next asks the desk for one id of the queue by name: a random one among the first 30 that this fleet has not
+  # submitted, given up, nor holds in a sibling worktree, and that has no statement in statements/ yet. An id the desk
+  # refuses (pull request already open, already formalized) is recorded in $OMA_SKIP and the next one is tried.
+  QUEUE_MODE=""
+  if [ -n "${OMA_NO_PR:-}" ] && [ -n "${OMA_QUEUE:-}" ] && [ -f "$OMA_QUEUE" ] && [[ "$Q" != *"&problem="* ]]; then
+    QUEUE_MODE=1
+    git ls-remote origin 'refs/heads/oma/*' 2>/dev/null | sed 's#.*refs/heads/oma/##' > "$STATE/remote_oma.txt" || true
+  fi
+  pick_from_queue() {
+    python3 -I - "$OMA_QUEUE" "$LINKS" "${OMA_SKIP:-$STATE/skip.txt}" "$STATE/remote_oma.txt" "$ROOT" <<'PYQ'
+import glob, os, random, re, sys
+queue, links, skip, remote, root = sys.argv[1:6]
+def ids(path):
+    try: return {l.split("\t")[0].strip() for l in open(path, encoding="utf-8") if l.strip()}
+    except OSError: return set()
+done = ids(links) | ids(skip) | ids(remote)
+held = {os.path.basename(f) for f in glob.glob(os.path.join(root, "..", "*", ".oma", "leases", "*"))}
+held |= {os.path.basename(f) for f in glob.glob(os.path.join(root, ".oma", "leases", "*"))}
+free = []
+for line in open(queue, encoding="utf-8"):
+    i = line.split("\t")[0].strip()
+    if not i or i in done or i in held or re.sub(r"[^A-Za-z0-9._-]", "-", i)[:80] in done: continue
+    if os.path.exists(os.path.join(root, "statements", i + ".lean")): continue
+    free.append(i)
+    if len(free) >= 30: break
+print(random.choice(free) if free else "")
+PYQ
+  }
+  TRIES=5; [ -z "$QUEUE_MODE" ] || TRIES=12
+  for TRY in $(seq 1 "$TRIES"); do
+    QQ="$Q"
+    if [ -n "$QUEUE_MODE" ]; then
+      PID="$(pick_from_queue)"; [ -n "$PID" ] || die "the queue $OMA_QUEUE has no problem left for this fleet"
+      QQ="$Q&problem=$(enc "$PID")"
+    fi
+    R="$(curl -sS -m 30 "$SITE/api/desk/next?$QQ")"
+    ERR="$(echo "$R" | jget error)"
+    if [ -n "$ERR" ] && [ -n "$QUEUE_MODE" ] && [[ "$ERR" != too_many_leases && "$ERR" != rate_limited && "$ERR" != bad_handle ]]; then
+      echo "oma: the desk refused $PID ($ERR); taking another from the queue" >&2
+      printf '%s\tdesk:%s\n' "$PID" "$ERR" >> "${OMA_SKIP:-$STATE/skip.txt}"; continue
+    fi
+    [ -z "$ERR" ] || die "desk said: $ERR $(echo "$R" | jget hint)"
     ID="$(echo "$R" | jget problem.id)"; FILE="$(echo "$R" | jget file)"
     [ -n "${OMA_NO_PR:-}" ] || break
     SUBMITTED=0
@@ -107,8 +148,9 @@ next)
       echo "oma: $ID is already submitted (its pull request waits for your owner) or was given up by your fleet; taking another" >&2
       curl -sS -m 30 -o /dev/null -X POST "$SITE/api/desk/release?lease=$(echo "$R" | jget lease)&reason=other" || true
     fi
-    [ "$TRY" -lt 5 ] || die "the desk keeps handing out problems already submitted; ask your owner to open their pull requests"
+    [ "$TRY" -lt "$TRIES" ] || die "the desk keeps handing out problems already submitted; ask your owner to open their pull requests"
   done
+  [ -z "$ERR" ] && [ -n "${ID:-}" ] || die "no problem taken: the desk refused every id tried from the queue"
   echo "$R" | jget lease > "$STATE/leases/$ID"
   mkdir -p "$STATE/briefs"; curl -sS -m 60 "$SITE/p/$(enc "$ID")/agent.txt" -o "$STATE/briefs/$ID.txt" || true
   mkdir -p "$(dirname "$FILE")"

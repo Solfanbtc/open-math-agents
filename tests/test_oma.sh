@@ -198,6 +198,14 @@ mkdir -p "$T/sibling/.oma/leases"; echo 44444444 > "$T/sibling/.oma/leases/Held.
 OUT="$(OMA_NO_PR=1 OMA_SKIP="$T/skip.txt" OMA_PR_LINKS="$T/links.txt" tools/oma.sh next --problem Held.p 2>&1)"; RC=$?
 check "next OMA_NO_PR: a problem held by a sibling worker is skipped, not released" '[ $RC -ne 0 ] && [[ "$OUT" == *"held by another worker"* ]] && ! grep -q "release" "$MOCK_LOG" && [ ! -f .oma/leases/Held.p ]'
 
+# OMA_QUEUE: next asks for a queued id by name, skipping what the fleet did, gave up or holds
+printf '%s\n' Linked.p Gave.p Held.p Queued.p > "$T/queue.txt"; : > "$MOCK_LOG"; rm -f .oma/leases/Queued.p
+OUT="$(OMA_NO_PR=1 OMA_QUEUE="$T/queue.txt" OMA_SKIP="$T/skip.txt" OMA_PR_LINKS="$T/links.txt" tools/oma.sh next 2>&1)"; RC=$?
+check "next OMA_QUEUE: takes the first queued id the fleet has not done, by name" 'grep -q "\"problem\": \"Queued.p\"" "$MOCK_LOG" && [ -f .oma/leases/Queued.p ] && ! grep -q "\"problem\": \"Linked.p\"" "$MOCK_LOG"'
+printf '%s\n' Linked.p Gave.p > "$T/queue2.txt"
+OUT="$(OMA_NO_PR=1 OMA_QUEUE="$T/queue2.txt" OMA_SKIP="$T/skip.txt" OMA_PR_LINKS="$T/links.txt" tools/oma.sh next 2>&1)"; RC=$?
+check "next OMA_QUEUE: an exhausted queue stops with a clear message" '[ $RC -ne 0 ] && [[ "$OUT" == *"no problem left"* ]]'
+
 # A push that fails leaves the checkout where it was, with the file kept, and sends nothing
 tools/oma.sh next --problem Push.p >/dev/null 2>&1; echo "-- pushed later" >> proofs/Push.p.lean
 HEAD0="$(git rev-parse --abbrev-ref HEAD)"; GOOD_URL="$(git remote get-url origin)"
