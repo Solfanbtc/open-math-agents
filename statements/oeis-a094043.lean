@@ -12,9 +12,13 @@ positive integer not used before, prime if `n` is even and not prime if `n` is o
 decimal concatenation `a(1) a(2) ⋯ a(n)` is prime. `firstTerms n = [a(1), …, a(n)]`. Checked with
 python3: this reproduces the 57 listed terms 1, 3, 9, 13, 63, 107, 27, ...
 
-Conjecture (R. G. Wilson v): 2 and 5 are the only two (positive) nonmembers. (They can never
-occur, since a longer concatenation ending in 2 or 5 is composite.) `main` states that every
-positive integer other than 2 and 5 occurs.
+Conjecture (R. G. Wilson v): 2 and 5 are the only two (positive) nonmembers. Read literally this
+is trivially false: for `n ≥ 2` the concatenation `a(1) ⋯ a(n)` has at least two digits and ends
+with the digits of `a(n)`, so it can only be prime if `a(n)` is odd and does not end in 5. Hence
+no even number and no multiple of 5 ever occurs (and `a(1) = 1`): 2, 4, 5, 6, 8, 10, 15, ... are
+all nonmembers, not just 2 and 5. The minimal fix states the evidently intended claim: the members
+are exactly the positive integers coprime to 10. `main` states that every `m ≥ 1` with
+`gcd(m, 10) = 1` occurs, together with the (easy) converse.
 -/
 
 namespace OMA.S_oeis_a094043
@@ -33,7 +37,7 @@ noncomputable def firstTerms : ℕ → List ℕ
 /-- `a n`: the `n`-th term (offset 1). -/
 noncomputable def a (n : ℕ) : ℕ := (firstTerms n).getD (n - 1) 0
 
-theorem main : ∀ m : ℕ, 1 ≤ m → m ≠ 2 → m ≠ 5 → ∃ n : ℕ, 1 ≤ n ∧ a n = m := by
+theorem main : ∀ m : ℕ, 1 ≤ m → ((∃ n : ℕ, 1 ≤ n ∧ a n = m) ↔ Nat.Coprime m 10) := by
   sorry
 
 end OMA.S_oeis_a094043
