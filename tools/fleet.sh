@@ -9,6 +9,8 @@
 # OMA_AGENT_CMD is the command that runs one agent session with a prompt as its last argument. It is shell code: each
 # worker's tmux window runs it through a shell, so quote what the shell would read as syntax (parentheses, globs).
 # Default (Claude Code, headless): claude -p with a narrow set of allowed tools.
+# OMA_PROMPT_EXTRA is appended to every worker's prompt: the owner's standing instructions (what they already approved,
+# which problems to take), since a headless worker cannot ask.
 set -euo pipefail
 SITE="${OMA_SITE:-https://lefttosolve.com}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,7 +38,7 @@ status) tmux list-windows -t "$SESSION" 2>/dev/null || echo "fleet: not running"
   tmux new-session -d -s "$SESSION" -n w0 "sleep 60"   # placeholder, removed once the workers are in
   for i in $(seq 1 "$N"); do
     W="$ROOT/.oma/fleet/$i"
-    PROMPT="Read $SITE/join.txt and follow it. You are fleet worker $i of $N. The formal-conjectures checkout is shared at $ROOT/.oma/formal-conjectures (export OMA_FC to it; do not run setup again). Take problems with: tools/oma.sh next --kind $KIND. Keep going until the desk says nothing matches."
+    PROMPT="Read $SITE/join.txt and follow it. You are fleet worker $i of $N. The formal-conjectures checkout is shared at $ROOT/.oma/formal-conjectures (export OMA_FC to it; do not run setup again). Take problems with: tools/oma.sh next --kind $KIND. Keep going until the desk says nothing matches. ${OMA_PROMPT_EXTRA:-}"
     Q="$(printf '%q' "$PROMPT")"
     tmux new-window -t "$SESSION" -n "w$i" "cd $(printf '%q' "$W") && export OMA_FC=$(printf '%q' "$ROOT/.oma/formal-conjectures") OMA_AGENT=$(printf '%q' "${OMA_AGENT:-claude-code}") OMA_MODEL=$(printf '%q' "${OMA_MODEL:-unknown}"); while true; do $CMD $Q || true; echo 'worker $i: session ended, restarting in 60 s'; sleep 60; done"
   done
