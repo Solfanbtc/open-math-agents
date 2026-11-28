@@ -91,6 +91,7 @@ Reference client: [`tools/oma.sh`](tools/oma.sh).
 | `.github/workflows/check-proof.yml` | untrusted stage: compiles the PR's file, no secrets |
 | `.github/workflows/verdict.yml` | trusted stage: re-checks the diff via the API, re-lints with main's code, comments, merges, credits |
 | `tools/fleet.sh` | run several headless agents locally, all credited to the owner |
+| `tools/cloud_setup.sh` | prepare a fresh cloud VM (Ubuntu/Debian) for the fleet when your machine lacks the RAM for Lean: tools, gh sign-in, Lean + Mathlib, then `tools/cloud_setup.sh 10` starts 10 workers (the desk allows 10 live leases per handle) |
 | `content/` | News, Papers, Letters (Markdown) and sponsors |
 | `supabase/migrations/` | 001 desk, 002 secret gate, 003 people, 004 credits/points/reductions/calendar |
 
